@@ -1,140 +1,58 @@
+
 const fs = require('fs');
 const path = require('path');
 
 // ==========================================
-// 1. Data Source
-// ==========================================
-
-const sampleStudents = [
-  {
-    id: 1,
-    name: 'Alice Johnson',
-    year: 3,
-    course: 'Computer Science',
-    grades: [92, 88, 95, 91],
-    enrolled: true
-  },
-  {
-    id: 2,
-    name: 'Bob Smith',
-    year: 1,
-    course: 'Information Technology',
-    grades: [75, 82, 79, 80],
-    enrolled: false
-  },
-  {
-    id: 3,
-    name: 'Charlie Brown',
-    year: 4,
-    course: 'Computer Science',
-    grades: [98, 94, 100, 96],
-    enrolled: true
-  },
-  {
-    id: 4,
-    name: 'Diana Prince',
-    year: 2,
-    course: 'Data Science',
-    grades: [88, 90, 85, 92],
-    enrolled: true
-  },
-  {
-    id: 5,
-    name: 'Ethan Hunt',
-    year: 2,
-    course: 'Cybersecurity',
-    grades: [65, 70, 68, 72],
-    enrolled: true
-  },
-  {
-    id: 6,
-    name: 'Fiona Gallagher',
-    year: 1,
-    course: 'Information Technology',
-    grades: [84, 86, 88, 85],
-    enrolled: true
-  },
-  {
-    id: 7,
-    name: 'George Clark',
-    year: 3,
-    course: 'Cybersecurity',
-    grades: [],
-    enrolled: false
-  },
-  {
-    id: 8,
-    name: 'Hannah Abbott',
-    year: 4,
-    course: 'Data Science',
-    grades: [95, 97, 93, 99],
-    enrolled: true
-  }
-];
-
-// ==========================================
-// 2. Core Analytics Functions
+// 1. Core Functions
 // ==========================================
 
 /**
  * Calculates the average grade for a single student.
+ * Handles students with empty or missing grade arrays safely.
  */
 function getAverageGrade(student) {
-  if (!student || typeof student !== 'object') {
-    throw new Error('Invalid input: Expected a student object.');
-  }
-  if (!Array.isArray(student.grades) || student.grades.length === 0) {
+  if (!student || !Array.isArray(student.grades) || student.grades.length === 0) {
     return 0;
   }
-  const total = student.grades.reduce((sum, grade) => sum + grade, 0);
-  return total / student.grades.length;
+  const sum = student.grades.reduce((acc, curr) => acc + curr, 0);
+  return sum / student.grades.length;
 }
 
 /**
- * Gets the top n performing students sorted by average grade.
+ * Returns the top n students sorted by average grade in descending order.
  */
 function getTopStudents(students, n) {
-  if (!Array.isArray(students)) {
-    throw new Error('Invalid input: Expected students to be an array.');
-  }
-  if (typeof n !== 'number' || n < 0 || !Number.isInteger(n)) {
-    throw new Error('Invalid input: n must be a non-negative integer.');
+  if (!Array.isArray(students)) return [];
+  if (typeof n !== 'number' || n < 0) {
+    throw new Error('Parameter "n" must be a non-negative integer.');
   }
 
-  return [...students]
-    .map(student => ({
-      ...student,
-      averageGrade: getAverageGrade(student)
-    }))
-    .sort((a, b) => b.averageGrade - a.averageGrade)
+  return [...students] // Avoid mutating the original array
+    .sort((a, b) => getAverageGrade(b) - getAverageGrade(a))
     .slice(0, n);
 }
 
 /**
- * Groups students by their enrolled course.
+ * Groups all students by their enrolled course.
  */
 function groupByCourse(students) {
-  if (!Array.isArray(students)) {
-    throw new Error('Invalid input: Expected students to be an array.');
-  }
+  if (!Array.isArray(students)) return {};
 
   return students.reduce((acc, student) => {
     const course = student.course || 'Unassigned';
     if (!acc[course]) {
       acc[course] = [];
     }
-    acc[course].push({ ...student });
+    acc[course].push(student);
     return acc;
   }, {});
 }
 
 /**
- * Counts enrolled versus non-enrolled students.
+ * Returns a count breakdown of enrolled vs. non-enrolled students.
  */
 function getEnrolledCount(students) {
-  if (!Array.isArray(students)) {
-    throw new Error('Invalid input: Expected students to be an array.');
-  }
+  if (!Array.isArray(students)) return { enrolled: 0, notEnrolled: 0 };
 
   return students.reduce(
     (acc, student) => {
@@ -150,130 +68,152 @@ function getEnrolledCount(students) {
 }
 
 /**
- * Performs a case-insensitive search for a student by name.
+ * Performs a case-insensitive search for a student by full name.
  */
 function findStudent(students, name) {
-  if (!Array.isArray(students)) {
-    throw new Error('Invalid input: Expected students to be an array.');
-  }
-  if (typeof name !== 'string') {
-    throw new Error('Invalid input: Name must be a string.');
-  }
+  if (!Array.isArray(students) || typeof name !== 'string') return null;
 
-  const searchTarget = name.trim().toLowerCase();
-  const match = students.find(
-    s => s.name && s.name.toLowerCase() === searchTarget
-  );
-
-  return match ? { ...match } : null;
+  const targetName = name.trim().toLowerCase();
+  return students.find((student) => student.name?.toLowerCase() === targetName) || null;
 }
 
 /**
- * Calculates average grade per course department.
+ * Calculates the average grade across all students per course,
+ * sorted from highest to lowest.
  */
 function getCourseAverages(students) {
-  if (!Array.isArray(students)) {
-    throw new Error('Invalid input: Expected students to be an array.');
-  }
+  if (!Array.isArray(students) || students.length === 0) return [];
 
   const grouped = groupByCourse(students);
-  
-  const courseAverages = Object.keys(grouped).map(course => {
-    const courseStudents = grouped[course];
-    const totalGrades = courseStudents.map(getAverageGrade);
-    const avg = totalGrades.length > 0 
-      ? totalGrades.reduce((sum, val) => sum + val, 0) / totalGrades.length 
-      : 0;
-    
-    return {
-      course,
-      averageGrade: Number(avg.toFixed(2))
-    };
-  });
 
-  return courseAverages.sort((a, b) => b.averageGrade - a.averageGrade);
+  return Object.entries(grouped)
+    .map(([course, courseStudents]) => {
+      const allGrades = courseStudents.flatMap((s) => s.grades || []);
+      const avg =
+        allGrades.length > 0
+          ? allGrades.reduce((sum, g) => sum + g, 0) / allGrades.length
+          : 0;
+
+      return {
+        course,
+        averageGrade: Number(avg.toFixed(2)),
+      };
+    })
+    .sort((a, b) => b.averageGrade - a.averageGrade);
 }
 
 /**
- * Constructs an overall summary payload.
+ * Builds a comprehensive summary object for the dataset.
  */
 function exportSummary(students) {
-  if (!Array.isArray(students)) {
-    throw new Error('Invalid input: Expected students to be an array.');
-  }
-
-  const totalStudents = students.length;
-  
-  if (totalStudents === 0) {
+  if (!Array.isArray(students) || students.length === 0) {
     return {
       totalStudents: 0,
-      overallAverage: 0,
+      overallAverageGrade: 0,
       topStudent: null,
-      courseBreakdown: []
+      courseBreakdown: [],
     };
   }
 
-  const totalAverages = students.map(getAverageGrade);
-  const overallAvg = totalAverages.reduce((sum, g) => sum + g, 0) / totalStudents;
+  const allGrades = students.flatMap((s) => s.grades || []);
+  const overallAverageGrade =
+    allGrades.length > 0
+      ? allGrades.reduce((sum, g) => sum + g, 0) / allGrades.length
+      : 0;
+
   const topStudent = getTopStudents(students, 1)[0] || null;
 
   return {
-    totalStudents,
-    overallAverage: Number(overallAvg.toFixed(2)),
-    topStudent: topStudent ? { name: topStudent.name, averageGrade: Number(topStudent.averageGrade.toFixed(2)) } : null,
-    courseBreakdown: getCourseAverages(students)
+    totalStudents: students.length,
+    overallAverageGrade: Number(overallAverageGrade.toFixed(2)),
+    topStudent: topStudent
+      ? {
+          id: topStudent.id,
+          name: topStudent.name,
+          course: topStudent.course,
+          averageGrade: Number(getAverageGrade(topStudent).toFixed(2)),
+        }
+      : null,
+    courseBreakdown: getCourseAverages(students),
   };
 }
 
 // ==========================================
-// 3. Execution & File Output
+// 2. Data Loader & Main Runner
 // ==========================================
 
-function main() {
-  const reportPath = path.join(__dirname, 'report.json');
-
-  console.log('='.repeat(50));
-  console.log('         STUDENT DATA ANALYSIS REPORT          ');
-  console.log('='.repeat(50));
-
-  const enrollmentStatus = getEnrolledCount(sampleStudents);
-  console.log(`\n[+] Total Students : ${sampleStudents.length}`);
-  console.log(`    - Enrolled     : ${enrollmentStatus.enrolled}`);
-  console.log(`    - Not Enrolled : ${enrollmentStatus.notEnrolled}`);
-
-  const summary = exportSummary(sampleStudents);
-  console.log(`\n[+] Overall Class Average : ${summary.overallAverage}`);
-
-  const topThree = getTopStudents(sampleStudents, 3);
-  console.log('\n[+] Top 3 Performing Students:');
-  topThree.forEach((s, idx) => {
-    console.log(`    ${idx + 1}. ${s.name} (${s.course}) - Avg: ${s.averageGrade.toFixed(2)}`);
-  });
-
-  const courseAverages = getCourseAverages(sampleStudents);
-  console.log('\n[+] Course Average Grades (Descending):');
-  courseAverages.forEach(c => {
-    console.log(`    - ${c.course.padEnd(22)} : ${c.averageGrade}`);
-  });
-
-  const searchName = 'Alice Johnson';
-  const found = findStudent(sampleStudents, searchName);
-  console.log(`\n[+] Search Result for "${searchName}":`);
-  if (found) {
-    console.log(`    Found: ID #${found.id} | Course: ${found.course} | Avg Grade: ${getAverageGrade(found).toFixed(2)}`);
-  } else {
-    console.log('    No matching student found.');
-  }
-
+function loadDataset(filePath) {
   try {
-    fs.writeFileSync(reportPath, JSON.stringify(summary, null, 2), 'utf8');
-    console.log(`\n[+] Summary file created at: "${reportPath}"`);
-  } catch (err) {
-    console.error('Failed to export summary file:', err.message);
-  }
+    const fullPath = path.resolve(filePath);
+    if (!fs.existsSync(fullPath)) {
+      console.warn(`File not found at ${fullPath}. Creating mock dataset...`);
+      const sampleData = [
+        { id: 1, name: 'Alice Smith', year: 2, course: 'Computer Science', grades: [88, 92, 95], enrolled: true },
+        { id: 2, name: 'Bob Jones', year: 3, course: 'Mathematics', grades: [78, 85, 80], enrolled: true },
+        { id: 3, name: 'Charlie Brown', year: 1, course: 'Computer Science', grades: [90, 87, 93], enrolled: false },
+        { id: 4, name: 'Diana Prince', year: 4, course: 'Physics', grades: [98, 96, 100], enrolled: true },
+        { id: 5, name: 'Evan Wright', year: 2, course: 'Mathematics', grades: [], enrolled: false }
+      ];
+      fs.writeFileSync(fullPath, JSON.stringify(sampleData, null, 2));
+      return sampleData;
+    }
 
-  console.log('\n' + '='.repeat(50));
+    const rawData = fs.readFileSync(fullPath, 'utf8');
+    return JSON.parse(rawData);
+  } catch (error) {
+    console.error('Error loading dataset:', error.message);
+    return [];
+  }
 }
 
-// Run script
+function main() {
+  const dataPath = path.join(__dirname, 'students.json');
+  const students = loadDataset(dataPath);
+
+  console.log('===================================================');
+  console.log('              STUDENT RECORDS REPORT               ');
+  console.log('===================================================\n');
+
+  // Total and Enrolled Breakdown
+  const enrollmentStatus = getEnrolledCount(students);
+  console.log(`Total Students Loaded: ${students.length}`);
+  console.log(`Enrolled: ${enrollmentStatus.enrolled} | Not Enrolled: ${enrollmentStatus.notEnrolled}\n`);
+
+  // Top Students
+  console.log('--- TOP 3 STUDENTS ---');
+  const topStudents = getTopStudents(students, 3);
+  topStudents.forEach((student, index) => {
+    const avg = getAverageGrade(student).toFixed(2);
+    console.log(`${index + 1}. ${student.name} (${student.course}) - Avg: ${avg}`);
+  });
+  console.log('');
+
+  // Course Averages
+  console.log('--- AVERAGE GRADE BY COURSE ---');
+  const courseAverages = getCourseAverages(students);
+  courseAverages.forEach((item) => {
+    console.log(`- ${item.course}: ${item.averageGrade}`);
+  });
+  console.log('');
+
+  // Search Example
+  console.log('--- STUDENT SEARCH TEST ---');
+  const searchName = 'Alice Smith';
+  const foundStudent = findStudent(students, searchName);
+  if (foundStudent) {
+    console.log(`Found: ${foundStudent.name} | ID: ${foundStudent.id} | Course: ${foundStudent.course}`);
+  } else {
+    console.log(`Student "${searchName}" not found.`);
+  }
+  console.log('');
+
+  // Export Summary to JSON File
+  const summary = exportSummary(students);
+  const outputPath = path.join(__dirname, 'report.json');
+  fs.writeFileSync(outputPath, JSON.stringify(summary, null, 2));
+  console.log(`[SUCCESS] Summary exported to ${outputPath}\n`);
+  console.log('===================================================');
+}
+
+// Execute program
 main();
