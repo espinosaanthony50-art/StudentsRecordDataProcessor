@@ -1,14 +1,4 @@
-# 1. Create project folder and step inside
-mkdir student-records-processor && cd student-records-processor
 
-# 2. Create app.js
-cat << 'EOF' > app.js
-const fs = require('fs');
-const path = require('path');
-
-// ==========================================
-// Core Functions
-// ==========================================
 
 function getAverageGrade(student) {
   if (!student || typeof student !== 'object') {
