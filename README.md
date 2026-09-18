@@ -1,14 +1,12 @@
-
 const fs = require('fs');
 const path = require('path');
 
 // ==========================================
-// 1. Core Functions
+// 1. Data Processor Functions
 // ==========================================
 
 /**
  * Calculates the average grade for a single student.
- * Handles students with empty or missing grade arrays safely.
  */
 function getAverageGrade(student) {
   if (!student || !Array.isArray(student.grades) || student.grades.length === 0) {
@@ -19,21 +17,21 @@ function getAverageGrade(student) {
 }
 
 /**
- * Returns the top n students sorted by average grade in descending order.
+ * Returns the top n students sorted by average grade descending.
  */
 function getTopStudents(students, n) {
   if (!Array.isArray(students)) return [];
   if (typeof n !== 'number' || n < 0) {
-    throw new Error('Parameter "n" must be a non-negative integer.');
+    throw new Error('Parameter "n" must be a non-negative number.');
   }
 
-  return [...students] // Avoid mutating the original array
+  return [...students]
     .sort((a, b) => getAverageGrade(b) - getAverageGrade(a))
     .slice(0, n);
 }
 
 /**
- * Groups all students by their enrolled course.
+ * Groups all students by their course field.
  */
 function groupByCourse(students) {
   if (!Array.isArray(students)) return {};
@@ -49,7 +47,7 @@ function groupByCourse(students) {
 }
 
 /**
- * Returns a count breakdown of enrolled vs. non-enrolled students.
+ * Returns count of enrolled vs non-enrolled students.
  */
 function getEnrolledCount(students) {
   if (!Array.isArray(students)) return { enrolled: 0, notEnrolled: 0 };
@@ -68,7 +66,7 @@ function getEnrolledCount(students) {
 }
 
 /**
- * Performs a case-insensitive search for a student by full name.
+ * Case-insensitive student search by name.
  */
 function findStudent(students, name) {
   if (!Array.isArray(students) || typeof name !== 'string') return null;
@@ -78,8 +76,7 @@ function findStudent(students, name) {
 }
 
 /**
- * Calculates the average grade across all students per course,
- * sorted from highest to lowest.
+ * Calculates average grade per course, sorted highest to lowest.
  */
 function getCourseAverages(students) {
   if (!Array.isArray(students) || students.length === 0) return [];
@@ -103,7 +100,7 @@ function getCourseAverages(students) {
 }
 
 /**
- * Builds a comprehensive summary object for the dataset.
+ * Exports summary statistics.
  */
 function exportSummary(students) {
   if (!Array.isArray(students) || students.length === 0) {
@@ -139,81 +136,73 @@ function exportSummary(students) {
 }
 
 // ==========================================
-// 2. Data Loader & Main Runner
+// 2. Main Execution
 // ==========================================
 
-function loadDataset(filePath) {
+function main() {
+  const filePath = path.join(__dirname, 'students.json');
+  let students = [];
+
+  // Load from disk using fs.readFileSync or create sample if missing
   try {
-    const fullPath = path.resolve(filePath);
-    if (!fs.existsSync(fullPath)) {
-      console.warn(`File not found at ${fullPath}. Creating mock dataset...`);
-      const sampleData = [
+    if (fs.existsSync(filePath)) {
+      const rawData = fs.readFileSync(filePath, 'utf8');
+      students = JSON.parse(rawData);
+    } else {
+      students = [
         { id: 1, name: 'Alice Smith', year: 2, course: 'Computer Science', grades: [88, 92, 95], enrolled: true },
         { id: 2, name: 'Bob Jones', year: 3, course: 'Mathematics', grades: [78, 85, 80], enrolled: true },
         { id: 3, name: 'Charlie Brown', year: 1, course: 'Computer Science', grades: [90, 87, 93], enrolled: false },
         { id: 4, name: 'Diana Prince', year: 4, course: 'Physics', grades: [98, 96, 100], enrolled: true },
         { id: 5, name: 'Evan Wright', year: 2, course: 'Mathematics', grades: [], enrolled: false }
       ];
-      fs.writeFileSync(fullPath, JSON.stringify(sampleData, null, 2));
-      return sampleData;
+      fs.writeFileSync(filePath, JSON.stringify(students, null, 2));
     }
-
-    const rawData = fs.readFileSync(fullPath, 'utf8');
-    return JSON.parse(rawData);
   } catch (error) {
-    console.error('Error loading dataset:', error.message);
-    return [];
+    console.error('Error reading students.json:', error.message);
+    return;
   }
-}
-
-function main() {
-  const dataPath = path.join(__dirname, 'students.json');
-  const students = loadDataset(dataPath);
 
   console.log('===================================================');
   console.log('              STUDENT RECORDS REPORT               ');
   console.log('===================================================\n');
 
-  // Total and Enrolled Breakdown
-  const enrollmentStatus = getEnrolledCount(students);
+  // Enrollment Count
+  const status = getEnrolledCount(students);
   console.log(`Total Students Loaded: ${students.length}`);
-  console.log(`Enrolled: ${enrollmentStatus.enrolled} | Not Enrolled: ${enrollmentStatus.notEnrolled}\n`);
+  console.log(`Enrolled: ${status.enrolled} | Not Enrolled: ${status.notEnrolled}\n`);
 
   // Top Students
   console.log('--- TOP 3 STUDENTS ---');
   const topStudents = getTopStudents(students, 3);
   topStudents.forEach((student, index) => {
-    const avg = getAverageGrade(student).toFixed(2);
-    console.log(`${index + 1}. ${student.name} (${student.course}) - Avg: ${avg}`);
+    console.log(`${index + 1}. ${student.name} (${student.course}) - Avg: ${getAverageGrade(student).toFixed(2)}`);
   });
   console.log('');
 
   // Course Averages
   console.log('--- AVERAGE GRADE BY COURSE ---');
-  const courseAverages = getCourseAverages(students);
-  courseAverages.forEach((item) => {
+  getCourseAverages(students).forEach((item) => {
     console.log(`- ${item.course}: ${item.averageGrade}`);
   });
   console.log('');
 
-  // Search Example
+  // Student Search
   console.log('--- STUDENT SEARCH TEST ---');
-  const searchName = 'Alice Smith';
-  const foundStudent = findStudent(students, searchName);
-  if (foundStudent) {
-    console.log(`Found: ${foundStudent.name} | ID: ${foundStudent.id} | Course: ${foundStudent.course}`);
+  const found = findStudent(students, 'Alice Smith');
+  if (found) {
+    console.log(`Found: ${found.name} | ID: ${found.id} | Course: ${found.course}`);
   } else {
-    console.log(`Student "${searchName}" not found.`);
+    console.log('Student not found.');
   }
   console.log('');
 
-  // Export Summary to JSON File
+  // Write Summary to Disk
   const summary = exportSummary(students);
-  const outputPath = path.join(__dirname, 'report.json');
-  fs.writeFileSync(outputPath, JSON.stringify(summary, null, 2));
-  console.log(`[SUCCESS] Summary exported to ${outputPath}\n`);
+  const reportPath = path.join(__dirname, 'report.json');
+  fs.writeFileSync(reportPath, JSON.stringify(summary, null, 2));
+  console.log(`[SUCCESS] Generated summary report at ${reportPath}\n`);
   console.log('===================================================');
 }
 
-// Execute program
 main();
